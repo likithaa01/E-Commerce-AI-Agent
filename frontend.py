@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 import time
 
-FASTAPI_URL = "http://127.0.0.1:8000/ask"  # Ensure FastAPI is running
+FASTAPI_URL = "http://127.0.0.1:8000/ask"  
 
 st.set_page_config(page_title="E-commerce AI Agent", layout="centered")
 
@@ -18,30 +18,40 @@ if st.button("Ask"):
         st.warning("Please enter a question.")
     else:
         with st.spinner("Thinking..."):
-            # Send question to FastAPI backend
-            response = requests.post(FASTAPI_URL, json={"question": question})
-            if response.status_code == 200:
-                data = response.json()
+            try:
+                response = requests.post(FASTAPI_URL, json={"question": question})
+                if response.status_code == 200:
+                    data = response.json()
 
-                # Typing effect for SQL
-                st.subheader("Generated SQL Query:")
-                sql_placeholder = st.empty()
-                for i in range(len(data['generated_sql'])):
-                    sql_placeholder.text(data['generated_sql'][:i+1])
-                    time.sleep(0.01)
+                    st.subheader("Generated SQL Query:")
+                    sql_placeholder = st.empty()
+                    for i in range(len(data['generated_sql'])):
+                        sql_placeholder.text(data['generated_sql'][:i+1])
+                        time.sleep(0.01)
 
-                # Display Result
-                st.subheader("Result:")
-                result = data["result"]
-                if isinstance(result, list) and len(result) > 0:
-                    df = pd.DataFrame(result)
-                    st.dataframe(df)
-                    
-                    # Plot chart if required
-                    if data.get("chart_required", False) and "date" in df.columns and "total_sales" in df.columns:
-                        fig = px.line(df, x="date", y="total_sales", title="Sales Trend")
-                        st.plotly_chart(fig)
+                    st.subheader("Result:")
+                    result = data["result"]
+                    if isinstance(result, list) and len(result) > 0:
+                        df = pd.DataFrame(result)
+                        st.dataframe(df)
+
+                        st.write("Columns in DataFrame:", df.columns.tolist())
+
+                        if "date" in df.columns:
+                            numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
+                            numeric_cols = [col for col in numeric_cols if col != "date"]
+
+                            if numeric_cols:
+                                y_col = numeric_cols[0]  # Pick the first numeric column
+                                fig = px.line(df, x="date", y=y_col, title=f"{y_col} Trend")
+                                st.plotly_chart(fig)
+                            else:
+                                st.info("No numeric columns found to plot a graph.")
+                        else:
+                            st.info("No 'date' column found for plotting a trend graph.")
+                    else:
+                        st.write(result)
                 else:
-                    st.write(result)
-            else:
-                st.error("Error connecting to FastAPI backend.")
+                    st.error(f"Error connecting to FastAPI backend. Status code: {response.status_code}")
+            except Exception as e:
+                st.error(f"Request failed: {e}")

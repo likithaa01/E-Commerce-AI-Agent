@@ -3,7 +3,6 @@ import sqlite3
 import pandas as pd
 
 
-# Path to your SQLite DB
 DB_PATH = "ecommerce.db"
 
 
@@ -12,7 +11,6 @@ def query_llm_for_sql(question: str) -> str:
     Ask Mistral 7B (via Ollama) to generate SQL based on the question and schema.
     """
 
-    # Database schema for reference
     schema = """
     Tables:
 
@@ -41,7 +39,6 @@ def query_llm_for_sql(question: str) -> str:
     )
     """
 
-    # Prompt with examples (Few-shot learning)
     prompt = f"""
     You are an SQL expert. Always output only the SQL query without explanation or formatting.
 
@@ -71,11 +68,9 @@ def query_llm_for_sql(question: str) -> str:
     A:
     """
 
-    # Query Mistral 7B via Ollama
     response = ollama.chat(model='mistral', messages=[{'role': 'user', 'content': prompt}])
     sql_query = response['message']['content'].strip()
 
-    # Clean output if it contains code blocks (like ```sql ... ```)
     if sql_query.startswith("```"):
         sql_query = sql_query.split("```")[1]
         sql_query = sql_query.replace("sql", "").strip()
@@ -96,15 +91,11 @@ def run_sql_query(sql_query: str):
         return f"Error executing SQL: {e}"
 
 
-# Example usage
 if __name__ == "__main__":
-    # Example question
     question = "Which product had the highest CPC?"
     
-    # Step 1: Generate SQL query
     sql = query_llm_for_sql(question)
     print("Generated SQL Query:\n", sql)
 
-    # Step 2: Execute SQL query
     result = run_sql_query(sql)
     print("\nQuery Result:\n", result)

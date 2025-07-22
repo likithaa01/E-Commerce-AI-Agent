@@ -62,9 +62,11 @@ A: SELECT item_id FROM eligibility_table WHERE eligibility != 'Yes';
 
 Important:
 - Always qualify columns with table names if there is a common column (e.g., date).
+- Always prefix columns with the table alias (e.g., t.date, a.ad_sales).
 - Use LEFT JOIN instead of FULL OUTER JOIN (SQLite doesn't support FULL OUTER JOIN).
-- Prefer COALESCE(table1.date, table2.date) as date when combining date columns.
-
+- Prefer COALESCE(table1.date, table2.date) AS date when combining date columns.
+- If a question can be answered using one table, do not perform joins.
+- Always use the column name from total_sales_metrics for sales trends (e.g., t.date and t.total_sales).
 """
 
 app = FastAPI(title="E-Commerce Data AI Agent")
@@ -73,12 +75,22 @@ class Question(BaseModel):
     question: str
 
 def query_llm_for_sql(question: str) -> str:
-    prompt = PROMPT_TEMPLATE + f"\n\nNow, convert this question into an SQL query:\nQ: {question}\nA:"
+    prompt = PROMPT_TEMPLATE + f"""
+    Important:
+    - Use table aliasing (e.g., t.date, a.item_id) to avoid ambiguous columns.
+    - If a single table is enough (like total_sales_metrics for sales trends), use only that table.
+    - Always include GROUP BY and ORDER BY for trend-based questions (with t.date).
+    
+    Now convert this question into SQL:
+    Q: {question}
+    A:
+    """
     response = ollama.chat(model=MODEL_NAME, messages=[{'role': 'user', 'content': prompt}])
     sql_query = response['message']['content'].strip()
     if sql_query.startswith("```"):
         sql_query = sql_query.split("```")[1].replace("sql", "").strip()
     return sql_query
+
 
 def run_sql_query(sql_query: str):
     try:
@@ -94,7 +106,6 @@ def ask_question(q: Question):
     sql = query_llm_for_sql(q.question)
     result_df = run_sql_query(sql)
 
-    # Detect if chart should be generated (simple keyword check)
     chart_required = False
     if any(word in q.question.lower() for word in ["trend", "chart", "plot", "graph"]):
         chart_required = True
